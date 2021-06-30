@@ -125,7 +125,7 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
-    public static final PropertyDescriptor DIMENTIONS = new PropertyDescriptor
+    public static final PropertyDescriptor DIMENSIONS = new PropertyDescriptor
             .Builder().name("dimensions")
             .displayName("Dimensions")
             .description("Comma seperated list of dimensions.")
@@ -158,7 +158,7 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
 
     @Override
     protected void init(final ProcessorInitializationContext context) {
-        this.descriptors = List.of(KEY_JSON, APP_NAME, START_DATE, END_DATE, VIEW_ID, DIMENTIONS, METRICS);
+        this.descriptors = List.of(KEY_JSON, APP_NAME, START_DATE, END_DATE, VIEW_ID, DIMENSIONS, METRICS);
         this.relationships = Set.of(SUCCESS);
     }
 
@@ -213,7 +213,7 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
         // https://ga-dev-tools.web.app/dimensions-metrics-explorer/
 
         String metricsCSV = context.getProperty(METRICS.getName()).getValue();
-        String dimensionsCSV = context.getProperty(DIMENTIONS.getName()).getValue();
+        String dimensionsCSV = context.getProperty(DIMENSIONS.getName()).getValue();
 
         String[] metricNames = metricsCSV.split(",[ ]*");
         String[] dimensionNames = dimensionsCSV.split(",[ ]*");
@@ -263,7 +263,7 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
             flowFile = session.putAttribute(flowFile, APP_NAME.getName(), applicationName);
             flowFile = session.putAttribute(flowFile, VIEW_ID.getName(), viewID);
             flowFile = session.putAttribute(flowFile, METRICS.getName(), metricsCSV);
-            flowFile = session.putAttribute(flowFile, DIMENTIONS.getName(), dimensionsCSV);
+            flowFile = session.putAttribute(flowFile, DIMENSIONS.getName(), dimensionsCSV);
             flowFile = session.putAttribute(flowFile, START_DATE.getName(), startDate);
             flowFile = session.putAttribute(flowFile, END_DATE.getName(), endDate);
 
