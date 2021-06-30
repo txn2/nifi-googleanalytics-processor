@@ -36,17 +36,16 @@ import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.flowfile.attributes.CoreAttributes;
 import org.apache.nifi.processor.*;
 import org.apache.nifi.processor.exception.ProcessException;
+import org.apache.nifi.processor.io.OutputStreamCallback;
 import org.apache.nifi.processor.util.StandardValidators;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Tags({"google","analytics","report"})
 @CapabilityDescription("Get a Google Analytics report by view id, dimensions, metrics and date range")
@@ -158,8 +157,17 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
 
     @Override
     protected void init(final ProcessorInitializationContext context) {
-        this.descriptors = List.of(KEY_JSON, APP_NAME, START_DATE, END_DATE, VIEW_ID, DIMENSIONS, METRICS);
-        this.relationships = Set.of(SUCCESS);
+        this.descriptors = new ArrayList<>();
+        this.descriptors.add(KEY_JSON);
+        this.descriptors.add(APP_NAME);
+        this.descriptors.add(START_DATE);
+        this.descriptors.add(END_DATE);
+        this.descriptors.add(VIEW_ID);
+        this.descriptors.add(DIMENSIONS);
+        this.descriptors.add(METRICS);
+
+        this.relationships = new HashSet<>();
+        this.relationships.add(SUCCESS);
     }
 
     @Override
@@ -252,7 +260,13 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
         }
 
         if (jsonStringResponse != null) {
-            flowFile = session.write(flowFile, out -> out.write(jsonStringResponse.getBytes(StandardCharsets.UTF_8)));
+            flowFile = session.write(flowFile, new OutputStreamCallback() {
+                @Override
+                public void process(OutputStream out) throws IOException {
+                    out.write(jsonStringResponse.getBytes(StandardCharsets.UTF_8));
+                }
+            });
+
             flowFile = session.putAttribute(flowFile, CoreAttributes.MIME_TYPE.key(), APPLICATION_JSON);
 
             flowFile = session.putAttribute(flowFile, APP_NAME.getName(), applicationName);
