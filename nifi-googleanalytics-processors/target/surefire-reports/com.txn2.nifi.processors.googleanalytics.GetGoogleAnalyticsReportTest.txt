@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.txn2.nifi.processors.googleanalytics.GetGoogleAnalyticsReportTest
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.061 s - in com.txn2.nifi.processors.googleanalytics.GetGoogleAnalyticsReportTest
