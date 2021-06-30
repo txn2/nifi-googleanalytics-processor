@@ -10,3 +10,4 @@ IntelliJ IDEA
 *.tar.gz
 *.rar
 hs_err_pid*
+target
