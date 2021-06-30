@@ -176,8 +176,6 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
     public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
         FlowFile flowFile = session.create();
 
-        // https://developers.google.com/analytics/devguides/reporting/core/v4/quickstart/service-java
-
         String jsonKeyString = context.getProperty(KEY_JSON.getName()).getValue();
         InputStream jsonKeyInputStream = new ByteArrayInputStream(jsonKeyString.getBytes(StandardCharsets.UTF_8));
 
@@ -210,8 +208,6 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
         dateRange.setStartDate(startDate);
         dateRange.setEndDate(endDate);
 
-        // https://ga-dev-tools.web.app/dimensions-metrics-explorer/
-
         String metricsCSV = context.getProperty(METRICS.getName()).getValue();
         String dimensionsCSV = context.getProperty(DIMENSIONS.getName()).getValue();
 
@@ -232,7 +228,6 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
         String viewID = context.getProperty(VIEW_ID.getName()).getValue();
 
         // Create the ReportRequest object.
-        // https://analytics.google.com/analytics/web/#/a78786435w117825974p123316202/admin
         ReportRequest request = new ReportRequest()
                 .setViewId(viewID)
                 .setDateRanges(Collections.singletonList(dateRange))

@@ -32,4 +32,13 @@
         <module>nifi-googleanalytics-nar</module>
     </modules>
 
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub TXN2 Apache Maven Packages</name>
+            <url>https://maven.pkg.github.com/txn2/nifi-googleanalytics-processor</url>
+        </repository>
+    </distributionManagement>
+
+
 </project>
