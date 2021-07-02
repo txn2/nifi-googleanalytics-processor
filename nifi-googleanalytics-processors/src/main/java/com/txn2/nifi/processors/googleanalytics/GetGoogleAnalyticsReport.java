@@ -204,20 +204,20 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
             throw new ProcessException(e.getMessage());
         }
 
-        String applicationName = context.getProperty(APP_NAME.getName()).getValue();
+        String applicationName = context.getProperty(APP_NAME.getName()).evaluateAttributeExpressions().getValue();
         AnalyticsReporting analyticsService = new AnalyticsReporting.Builder(httpTransport, JSON_FACTORY, credential)
                 .setApplicationName(applicationName).build();
 
 
-        String startDate = context.getProperty(START_DATE.getName()).getValue();
-        String endDate = context.getProperty(END_DATE.getName()).getValue();
+        String startDate = context.getProperty(START_DATE.getName()).evaluateAttributeExpressions().getValue();
+        String endDate = context.getProperty(END_DATE.getName()).evaluateAttributeExpressions().getValue();
 
         DateRange dateRange = new DateRange();
         dateRange.setStartDate(startDate);
         dateRange.setEndDate(endDate);
 
-        String metricsCSV = context.getProperty(METRICS.getName()).getValue();
-        String dimensionsCSV = context.getProperty(DIMENSIONS.getName()).getValue();
+        String metricsCSV = context.getProperty(METRICS.getName()).evaluateAttributeExpressions().getValue();
+        String dimensionsCSV = context.getProperty(DIMENSIONS.getName()).evaluateAttributeExpressions().getValue();
 
         String[] metricNames = metricsCSV.split(",[ ]*");
         String[] dimensionNames = dimensionsCSV.split(",[ ]*");
@@ -233,7 +233,7 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
             dimensions.add(new Dimension().setName(dimensionName));
         }
 
-        String viewID = context.getProperty(VIEW_ID.getName()).getValue();
+        String viewID = context.getProperty(VIEW_ID.getName()).evaluateAttributeExpressions().getValue();
 
         // Create the ReportRequest object.
         ReportRequest request = new ReportRequest()
