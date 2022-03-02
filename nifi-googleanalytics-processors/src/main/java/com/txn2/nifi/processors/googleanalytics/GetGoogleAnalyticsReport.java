@@ -49,14 +49,18 @@ import java.util.*;
 
 @Tags({"google","analytics","report"})
 @CapabilityDescription("Get a Google Analytics report by view id, dimensions, metrics and date range")
-@InputRequirement(Requirement.INPUT_FORBIDDEN)
+@InputRequirement(Requirement.INPUT_ALLOWED)
 @WritesAttributes({
         @WritesAttribute(attribute="application_name", description="Application name from configuration parameter."),
         @WritesAttribute(attribute="start_date", description="Start date from configuration parameter."),
         @WritesAttribute(attribute="end_date", description="End date from configuration parameter."),
         @WritesAttribute(attribute="view_id", description="View ID from configuration parameter."),
         @WritesAttribute(attribute="dimensions", description="Dimensions CSV from configuration parameter."),
-        @WritesAttribute(attribute="metrics", description="Metrics CSV from configuration parameter.")
+        @WritesAttribute(attribute="metrics", description="Metrics CSV from configuration parameter."),
+        @WritesAttribute(attribute="page_size", description="Pagination parameter."),
+        @WritesAttribute(attribute="page_token", description="Pagination token."),
+        @WritesAttribute(attribute="order_by_dsc", description="Pagination token."),
+        @WritesAttribute(attribute="order_by_asc", description="Pagination token.")
 })
 public class GetGoogleAnalyticsReport extends AbstractProcessor {
 
@@ -146,6 +150,47 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
+    public static final PropertyDescriptor PAGE_SIZE = new PropertyDescriptor
+            .Builder().name("page_size")
+            .displayName("Page Size")
+            .description("A query returns the default of 1,000 rows. The Analytics Core Reporting API returns a maximum of 100,000 rows per request.")
+            .required(true)
+            .defaultValue("1000")
+            .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
+            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+            .addValidator(StandardValidators.NON_NEGATIVE_INTEGER_VALIDATOR)
+            .build();
+
+    public static final PropertyDescriptor PAGE_TOKEN = new PropertyDescriptor
+            .Builder().name("page_token")
+            .displayName("Page Token")
+            .description("A continuation token to get the next page of the results. Adding this to the request will return the rows after the pageToken. The pageToken should be the value returned in the nextPageToken parameter.")
+            .required(false)
+            .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
+            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .build();
+
+    public static final PropertyDescriptor ORDER_BY_DSC = new PropertyDescriptor
+            .Builder().name("order_by_dsc")
+            .displayName("Order Descending")
+            .description("Comma seperated list of dimensions to sort descending by value.")
+            .required(false)
+            .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
+            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .build();
+
+    public static final PropertyDescriptor ORDER_BY_ASC = new PropertyDescriptor
+            .Builder().name("order_by_asc")
+            .displayName("Order Ascending")
+            .description("Comma seperated list of dimensions ascending by value.")
+            .required(false)
+            .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
+            .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .build();
+
     public static final Relationship SUCCESS = new Relationship.Builder()
             .name("success")
             .description("success relationship")
@@ -164,7 +209,11 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
         this.descriptors.add(END_DATE);
         this.descriptors.add(VIEW_ID);
         this.descriptors.add(DIMENSIONS);
+        this.descriptors.add(PAGE_SIZE);
+        this.descriptors.add(PAGE_TOKEN);
         this.descriptors.add(METRICS);
+        this.descriptors.add(ORDER_BY_DSC);
+        this.descriptors.add(ORDER_BY_ASC);
 
         this.relationships = new HashSet<>();
         this.relationships.add(SUCCESS);
@@ -182,9 +231,15 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
 
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
-        FlowFile flowFile = session.create();
+        FlowFile flowFile = session.get();
+        if ( flowFile == null ) {
+            flowFile = session.create();
+        }
 
-        String jsonKeyString = context.getProperty(KEY_JSON.getName()).getValue();
+        String jsonKeyString = context.getProperty(KEY_JSON.getName())
+                .evaluateAttributeExpressions(flowFile)
+                .getValue();
+
         InputStream jsonKeyInputStream = new ByteArrayInputStream(jsonKeyString.getBytes(StandardCharsets.UTF_8));
 
         // implement state for credential expiration
@@ -204,20 +259,32 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
             throw new ProcessException(e.getMessage());
         }
 
-        String applicationName = context.getProperty(APP_NAME.getName()).evaluateAttributeExpressions().getValue();
+        String applicationName = context.getProperty(APP_NAME.getName())
+                .evaluateAttributeExpressions(flowFile)
+                .getValue();
+
         AnalyticsReporting analyticsService = new AnalyticsReporting.Builder(httpTransport, JSON_FACTORY, credential)
                 .setApplicationName(applicationName).build();
 
+        String startDate = context.getProperty(START_DATE.getName())
+                .evaluateAttributeExpressions(flowFile)
+                .getValue();
 
-        String startDate = context.getProperty(START_DATE.getName()).evaluateAttributeExpressions().getValue();
-        String endDate = context.getProperty(END_DATE.getName()).evaluateAttributeExpressions().getValue();
+        String endDate = context.getProperty(END_DATE.getName())
+                .evaluateAttributeExpressions(flowFile)
+                .getValue();
 
         DateRange dateRange = new DateRange();
         dateRange.setStartDate(startDate);
         dateRange.setEndDate(endDate);
 
-        String metricsCSV = context.getProperty(METRICS.getName()).evaluateAttributeExpressions().getValue();
-        String dimensionsCSV = context.getProperty(DIMENSIONS.getName()).evaluateAttributeExpressions().getValue();
+        String metricsCSV = context.getProperty(METRICS.getName())
+                .evaluateAttributeExpressions(flowFile)
+                .getValue();
+
+        String dimensionsCSV = context.getProperty(DIMENSIONS.getName())
+                .evaluateAttributeExpressions(flowFile)
+                .getValue();
 
         String[] metricNames = metricsCSV.split(",[ ]*");
         String[] dimensionNames = dimensionsCSV.split(",[ ]*");
@@ -233,14 +300,67 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
             dimensions.add(new Dimension().setName(dimensionName));
         }
 
-        String viewID = context.getProperty(VIEW_ID.getName()).evaluateAttributeExpressions().getValue();
+        String viewID = context.getProperty(VIEW_ID.getName())
+                .evaluateAttributeExpressions(flowFile)
+                .getValue();
+
+        Integer pageSize = context.getProperty(PAGE_SIZE.getName())
+                .evaluateAttributeExpressions(flowFile)
+                .asInteger();
 
         // Create the ReportRequest object.
         ReportRequest request = new ReportRequest()
+                .setPageSize(pageSize)
                 .setViewId(viewID)
                 .setDateRanges(Collections.singletonList(dateRange))
                 .setMetrics(metrics)
                 .setDimensions(dimensions);
+
+        // check for page token
+        String pageToken = context.getProperty(PAGE_TOKEN.getName())
+                .evaluateAttributeExpressions(flowFile)
+                .getValue();
+        if(pageToken != null && !pageToken.equals("")) {
+            request.setPageToken(pageToken);
+        }
+
+        String orderByAscCSV = context.getProperty(ORDER_BY_ASC.getName())
+                .evaluateAttributeExpressions(flowFile)
+                .getValue();
+
+        if (orderByAscCSV != null && !orderByAscCSV.equals("")) {
+            String[] orderByAscDims = orderByAscCSV.split(",[ ]*");
+            ArrayList<OrderBy> ascOrderBys = new ArrayList<>();
+            for (String orderByAscDim : orderByAscDims) {
+                ascOrderBys.add(new OrderBy()
+                        .setSortOrder("ASCENDING")
+                        .setOrderType("VALUE")
+                        .setFieldName(orderByAscDim));
+            }
+
+            if (!ascOrderBys.isEmpty()) {
+                request.setOrderBys(ascOrderBys);
+            }
+        }
+
+        String orderByDscCSV = context.getProperty(ORDER_BY_DSC.getName())
+                .evaluateAttributeExpressions(flowFile)
+                .getValue();
+
+        if (orderByDscCSV != null && !orderByDscCSV.equals("")) {
+            String[] orderByDscDims = orderByDscCSV.split(",[ ]*");
+            ArrayList<OrderBy> dscOrderBys = new ArrayList<>();
+            for (String orderByDscDim : orderByDscDims) {
+                dscOrderBys.add(new OrderBy()
+                        .setSortOrder("DESCENDING")
+                        .setOrderType("VALUE")
+                        .setFieldName(orderByDscDim));
+            }
+
+            if (!dscOrderBys.isEmpty()) {
+                request.setOrderBys(dscOrderBys);
+            }
+        }
 
         ArrayList<ReportRequest> requests = new ArrayList<>();
         requests.add(request);
@@ -268,13 +388,16 @@ public class GetGoogleAnalyticsReport extends AbstractProcessor {
             });
 
             flowFile = session.putAttribute(flowFile, CoreAttributes.MIME_TYPE.key(), APPLICATION_JSON);
-
             flowFile = session.putAttribute(flowFile, APP_NAME.getName(), applicationName);
             flowFile = session.putAttribute(flowFile, VIEW_ID.getName(), viewID);
             flowFile = session.putAttribute(flowFile, METRICS.getName(), metricsCSV);
             flowFile = session.putAttribute(flowFile, DIMENSIONS.getName(), dimensionsCSV);
             flowFile = session.putAttribute(flowFile, START_DATE.getName(), startDate);
             flowFile = session.putAttribute(flowFile, END_DATE.getName(), endDate);
+            flowFile = session.putAttribute(flowFile, PAGE_SIZE.getName(), String.valueOf(pageSize));
+            flowFile = session.putAttribute(flowFile, PAGE_TOKEN.getName(), pageToken);
+            flowFile = session.putAttribute(flowFile, ORDER_BY_DSC.getName(), orderByDscCSV);
+            flowFile = session.putAttribute(flowFile, ORDER_BY_ASC.getName(), orderByAscCSV);
 
             session.transfer(flowFile, SUCCESS);
         }
